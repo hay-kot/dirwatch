@@ -36,10 +36,12 @@ changelog:
       - "^docs:"
       - "^test:"
 brews:
-  - tap:
+  - repository:
       owner: hay-kot
       name: homebrew-watchexec-tap
-    description: "  watchexec is a simple, standalone tool that watches a path and runs a command whenever it detects a matching event."
+    description: |
+      watchexec is a simple, standalone tool that watches a path and runs a command whenever it
+      detects a matching event.
     license: MIT
     dependencies:
       - name: go

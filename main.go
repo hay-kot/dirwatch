@@ -29,6 +29,13 @@ func build() string {
 	return fmt.Sprintf("%s (%s) %s", version, short, date)
 }
 
+func envars(strs ...string) []string {
+	for i, s := range strs {
+		strs[i] = "WATCHEXEC_" + s
+	}
+	return strs
+}
+
 func main() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
@@ -38,9 +45,10 @@ func main() {
 		Version: build(),
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:  "config",
-				Usage: "path to the configuration file",
-				Value: "watchexec.toml",
+				Name:    "config",
+				Usage:   "path to the configuration file",
+				Value:   "watchexec.toml",
+				EnvVars: envars("CONFIG"),
 			},
 		},
 		Commands: []*cli.Command{
