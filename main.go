@@ -38,15 +38,10 @@ func envars(strs ...string) []string {
 }
 
 func main() {
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-
-	log.Debug().
-		Str("version", version).
-		Str("commit", commit).
-		Str("date", date).
-		Msg("build information")
-
-	log.Info().Msg("starting dirwatch")
+	log.Logger = log.Output(zerolog.ConsoleWriter{
+		Out:     os.Stderr,
+		NoColor: true,
+	})
 
 	app := &cli.App{
 		Name:    "dirwatch",

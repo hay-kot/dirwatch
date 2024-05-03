@@ -48,8 +48,10 @@ brews:
         type: optional
       - name: git
     service: |
-      run [opt_bin/"dirwatch", "watch"]
+      run [opt_bin/"dirwatch", "--config", etc/"dirwatch.toml", "watch"]
       keep_alive true
+      error_log_path var/"log/dirwatch.log"
+      log_path var/"log/dirwatch.log"
     test: |
       system "#{bin}/dirwatch version"
 
