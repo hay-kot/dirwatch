@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/fsnotify/fsnotify"
@@ -31,7 +32,7 @@ func build() string {
 
 func envars(strs ...string) []string {
 	for i, s := range strs {
-		strs[i] = "dirwatch_" + s
+		strs[i] = "DIRWATCH_" + s
 	}
 	return strs
 }
@@ -66,6 +67,21 @@ func main() {
 					cfg, err := config.New(path, file)
 					if err != nil {
 						return err
+					}
+
+					// configure logger
+					if cfg.Log.File != "" {
+						file, err := os.OpenFile(cfg.Log.File, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+						if err != nil {
+							log.Fatal().Err(err).Msg("failed to open log file")
+						}
+
+						w := io.MultiWriter(os.Stderr, file)
+
+						log.Logger = log.Output(zerolog.ConsoleWriter{
+							Out:     w,
+							NoColor: !cfg.Log.Color,
+						})
 					}
 
 					// Create new watcher.

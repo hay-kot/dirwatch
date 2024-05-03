@@ -58,6 +58,7 @@ func (c Config) Dump() (string, error) {
 }
 
 type Log struct {
+	File   string        `toml:"file"`
 	Level  zerolog.Level `toml:"level"`
 	Format string        `toml:"format"`
 	Color  bool          `toml:"color"`
