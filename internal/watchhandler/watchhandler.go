@@ -88,6 +88,9 @@ func (wh *WatchHandler) Handle(event fsnotify.Event) {
 
 	cmd := exec.Command(wh.cfg.Shell, wh.cfg.ShellCmd, cmdstr)
 
+	cmd.Stdout = log.Logger
+	cmd.Stderr = log.Logger
+
 	err = cmd.Run()
 	if err != nil {
 		log.Error().Err(err).Msg("failed to run command")
