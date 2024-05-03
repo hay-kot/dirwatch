@@ -6,8 +6,8 @@ import (
 
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/fsnotify/fsnotify"
-	"github.com/hay-kot/watchexec/internal/config"
-	"github.com/hay-kot/watchexec/internal/quicktmpl"
+	"github.com/hay-kot/dirwatch/internal/config"
+	"github.com/hay-kot/dirwatch/internal/quicktmpl"
 	"github.com/rs/zerolog/log"
 )
 

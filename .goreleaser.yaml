@@ -38,22 +38,20 @@ changelog:
 brews:
   - repository:
       owner: hay-kot
-      name: homebrew-watchexec-tap
+      name: homebrew-dirwatch-tap
     description: |
-      watchexec is a simple, standalone tool that watches a path and runs a command whenever it
+      dirwatch is a simple, standalone tool that watches a path and runs a command whenever it
       detects a matching event.
     license: MIT
     dependencies:
       - name: go
         type: optional
       - name: git
-
     service: |
-      run [opt_bin/"watchexec", "watch"]
-      environment_variables OIQ_OTEL_COLLECTOR_HOME: opt_prefix
+      run [opt_bin/"dirwatch", "watch"]
       keep_alive true
     test: |
-      system "#{bin}/watchexec version"
+      system "#{bin}/dirwatch version"
 
 # The lines beneath this are called `modelines`. See `:help modeline`
 # Feel free to remove those if you don't want/use them.

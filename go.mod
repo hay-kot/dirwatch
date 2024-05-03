@@ -1,4 +1,4 @@
-module github.com/hay-kot/watchexec
+module github.com/hay-kot/dirwatch
 
 go 1.22
 

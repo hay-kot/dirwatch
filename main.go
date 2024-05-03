@@ -9,8 +9,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
 
-	"github.com/hay-kot/watchexec/internal/config"
-	"github.com/hay-kot/watchexec/internal/watchhandler"
+	"github.com/hay-kot/dirwatch/internal/config"
+	"github.com/hay-kot/dirwatch/internal/watchhandler"
 )
 
 var (
@@ -31,7 +31,7 @@ func build() string {
 
 func envars(strs ...string) []string {
 	for i, s := range strs {
-		strs[i] = "WATCHEXEC_" + s
+		strs[i] = "dirwatch_" + s
 	}
 	return strs
 }
@@ -40,14 +40,14 @@ func main() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 	app := &cli.App{
-		Name:    "watchexec",
+		Name:    "dirwatch",
 		Usage:   "Watches a file directory and runs a shell command",
 		Version: build(),
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "config",
 				Usage:   "path to the configuration file",
-				Value:   "watchexec.toml",
+				Value:   "dirwatch.toml",
 				EnvVars: envars("CONFIG"),
 			},
 		},
@@ -162,6 +162,6 @@ func main() {
 	}
 
 	if err := app.Run(os.Args); err != nil {
-		log.Fatal().Err(err).Msg("failed to run watchexec")
+		log.Fatal().Err(err).Msg("failed to run dirwatch")
 	}
 }
