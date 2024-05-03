@@ -40,6 +40,14 @@ func envars(strs ...string) []string {
 func main() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
+	log.Debug().
+		Str("version", version).
+		Str("commit", commit).
+		Str("date", date).
+		Msg("build information")
+
+	log.Info().Msg("starting dirwatch")
+
 	app := &cli.App{
 		Name:    "dirwatch",
 		Usage:   "Watches a file directory and runs a shell command",
@@ -93,6 +101,7 @@ func main() {
 
 					for _, w := range cfg.Watchers {
 						for _, p := range w.Dirs {
+							log.Info().Str("path", p).Msg("watching path")
 							err := watcher.Add(p)
 							if err != nil {
 								return err
