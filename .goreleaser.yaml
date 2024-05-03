@@ -49,6 +49,7 @@ brews:
       - name: git
     service: |
       run [opt_bin/"dirwatch", "--config", etc/"dirwatch.toml", "watch"]
+      environment_variables PATH: std_service_path_env
       keep_alive true
       error_log_path var/"log/dirwatch.log"
       log_path var/"log/dirwatch.log"
