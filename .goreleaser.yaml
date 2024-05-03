@@ -35,6 +35,24 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
+brews:
+  - tap:
+      owner: hay-kot
+      name: homebrew-watchexec-tap
+    description: "  watchexec is a simple, standalone tool that watches a path and runs a command whenever it detects a matching event."
+    license: MIT
+    dependencies:
+      - name: go
+        type: optional
+      - name: git
+
+    service: |
+      run [opt_bin/"watchexec", "watch"]
+      environment_variables OIQ_OTEL_COLLECTOR_HOME: opt_prefix
+      keep_alive true
+    test: |
+      system "#{bin}/watchexec version"
+
 # The lines beneath this are called `modelines`. See `:help modeline`
 # Feel free to remove those if you don't want/use them.
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
