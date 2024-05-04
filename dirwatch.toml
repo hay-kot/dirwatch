@@ -11,6 +11,6 @@ scriptbin = "/Users/hayden/.dotfiles/bin/"
 
 [[watchers]]
 dirs = ["~/Downloads"]
-events = ["create", "write", "remove", "rename"]
+events = ["create"]
 matches = ["*.HEIC", "*.heic"]
 exec = "{{ .Vars.scriptbin }}/heic2jpeg '{{ .Path }}'"

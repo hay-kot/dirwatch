@@ -35,6 +35,23 @@ func (wh *WatchHandler) findWatcher(path string) (config.Watcher, bool) {
 	return config.Watcher{}, false
 }
 
+func EventStrToOp(event fsnotify.Event) string {
+	switch {
+	case event.Op&fsnotify.Create == fsnotify.Create:
+		return "create"
+	case event.Op&fsnotify.Write == fsnotify.Write:
+		return "write"
+	case event.Op&fsnotify.Remove == fsnotify.Remove:
+		return "remove"
+	case event.Op&fsnotify.Rename == fsnotify.Rename:
+		return "rename"
+	case event.Op&fsnotify.Chmod == fsnotify.Chmod:
+		return "chmod"
+	}
+
+	return "unknown"
+}
+
 func (wh *WatchHandler) Handle(event fsnotify.Event) {
 	w, ok := wh.findWatcher(event.Name)
 	if !ok {
@@ -42,6 +59,25 @@ func (wh *WatchHandler) Handle(event fsnotify.Event) {
 			Str("event", event.Op.String()).
 			Str("file_name", event.Name).
 			Msg("no watcher found for event")
+		return
+	}
+
+	// verify event type
+	eventStr := EventStrToOp(event)
+
+	hasEvent := false
+	for _, e := range w.Events {
+		if e == eventStr {
+			hasEvent = true
+			break
+		}
+	}
+
+	if !hasEvent {
+		log.Debug().
+			Str("event", event.Op.String()).
+			Str("file_name", event.Name).
+			Msg("no event match found for event")
 		return
 	}
 
