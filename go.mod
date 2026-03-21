@@ -3,11 +3,11 @@ module github.com/hay-kot/dirwatch
 go 1.22
 
 require (
-	github.com/BurntSushi/toml v1.3.2
 	github.com/bmatcuk/doublestar/v4 v4.6.1
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/rs/zerolog v1.31.0
 	github.com/urfave/cli/v2 v2.26.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (

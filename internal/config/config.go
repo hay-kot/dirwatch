@@ -1,28 +1,44 @@
 package config
 
 import (
-	"io"
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
-	"github.com/BurntSushi/toml"
-	"github.com/rs/zerolog"
+	"gopkg.in/yaml.v3"
+
+	"github.com/hay-kot/dirwatch/internal/paths"
 )
 
 type Config struct {
-	Shell    string `toml:"shell"`
-	ShellCmd string `toml:"shell_cmd"`
-
-	Log      Log            `toml:"log"`
-	Vars     map[string]any `toml:"vars"`
-	Watchers []Watcher      `toml:"watchers"`
+	Shell    string         `yaml:"shell"`
+	ShellCmd string         `yaml:"shell_cmd"`
+	Log      Log            `yaml:"log"`
+	Vars     map[string]any `yaml:"vars"`
+	Watchers []Watcher      `yaml:"watchers"`
 }
 
-func Default() *Config {
-	return &Config{
+type Log struct {
+	File   string `yaml:"file"`
+	Level  string `yaml:"level"`
+	Format string `yaml:"format"`
+	Color  bool   `yaml:"color"`
+}
+
+type Watcher struct {
+	Dirs   []string `yaml:"dirs"`
+	Events []string `yaml:"events"`
+	Match  []string `yaml:"matches"`
+	Exec   string   `yaml:"exec"`
+}
+
+func Default() Config {
+	return Config{
 		Shell:    "/bin/bash",
 		ShellCmd: "-c",
 		Log: Log{
-			Level:  zerolog.InfoLevel,
+			Level:  "info",
 			Format: "text",
 			Color:  false,
 		},
@@ -30,43 +46,40 @@ func Default() *Config {
 	}
 }
 
-func New(confpath string, reader io.Reader) (*Config, error) {
+func Read() (Config, error) {
+	return ReadFrom(filepath.Join(paths.ConfigDir(), "config.yaml"))
+}
+
+func ReadFrom(path string) (Config, error) {
 	cfg := Default()
-	_, err := toml.NewDecoder(reader).Decode(cfg)
+
+	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		if os.IsNotExist(err) {
+			return cfg, nil
+		}
+		return cfg, fmt.Errorf("reading config: %w", err)
 	}
 
-	// Expand paths
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return cfg, fmt.Errorf("parsing config: %w", err)
+	}
+
+	dir := filepath.Dir(path)
 	for i := range cfg.Watchers {
 		for j := range cfg.Watchers[i].Dirs {
-			cfg.Watchers[i].Dirs[j] = ExpandPath(confpath, cfg.Watchers[i].Dirs[j])
+			cfg.Watchers[i].Dirs[j] = ExpandPath(dir, cfg.Watchers[i].Dirs[j])
 		}
-
-		cfg.Watchers[i].Exec = ExpandPath(confpath, cfg.Watchers[i].Exec)
+		cfg.Watchers[i].Exec = ExpandPath(dir, cfg.Watchers[i].Exec)
 	}
 
 	return cfg, nil
 }
 
-// Dump returns the configuration as a TOML string.
 func (c Config) Dump() (string, error) {
-	var b strings.Builder
-	enc := toml.NewEncoder(&b)
-	err := enc.Encode(c)
-	return b.String(), err
-}
-
-type Log struct {
-	File   string        `toml:"file"`
-	Level  zerolog.Level `toml:"level"`
-	Format string        `toml:"format"`
-	Color  bool          `toml:"color"`
-}
-
-type Watcher struct {
-	Dirs   []string `toml:"dirs"`
-	Events []string `toml:"events"`
-	Match  []string `toml:"matches"`
-	Exec   string   `toml:"exec"`
+	b, err := yaml.Marshal(c)
+	if err != nil {
+		return "", fmt.Errorf("encoding config: %w", err)
+	}
+	return strings.TrimSpace(string(b)), nil
 }

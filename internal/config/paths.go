@@ -3,20 +3,20 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 )
 
-func ExpandPath(confpath, input string) string {
-	if input[:2] == "~/" {
+func ExpandPath(confdir, input string) string {
+	if strings.HasPrefix(input, "~/") {
 		home, err := os.UserHomeDir()
 		if err != nil {
 			panic(err)
 		}
-		input = home + input[1:]
+		return filepath.Join(home, input[2:])
 	}
 
-	if input[:2] == "./" {
-		confdir := filepath.Dir(confpath)
-		input = confdir + input[1:]
+	if strings.HasPrefix(input, "./") {
+		return filepath.Join(confdir, input[2:])
 	}
 
 	return input
