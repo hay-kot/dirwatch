@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/urfave/cli/v3"
 )
@@ -24,5 +25,11 @@ func (cmd *ConfigCmd) Register(app *cli.Command) *cli.Command {
 }
 
 func (cmd *ConfigCmd) run(ctx context.Context, c *cli.Command) error {
+	dump, err := cmd.flags.Config.Dump()
+	if err != nil {
+		return fmt.Errorf("dumping config: %w", err)
+	}
+
+	fmt.Println(dump)
 	return nil
 }
