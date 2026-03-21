@@ -1,27 +1,44 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
+	"path/filepath"
+	"runtime/debug"
+	"syscall"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
-	"github.com/hay-kot/dirwatch/internal/config"
-	"github.com/hay-kot/dirwatch/internal/watchhandler"
+	"github.com/hay-kot/dirwatch/internal/commands"
+	"github.com/hay-kot/dirwatch/internal/paths"
 )
 
 var (
-	// Build information. Populated at build-time via -ldflags flag.
 	version = "dev"
 	commit  = "HEAD"
 	date    = "now"
 )
 
 func build() string {
+	if version == "dev" {
+		if info, ok := debug.ReadBuildInfo(); ok {
+			version = info.Main.Version
+			for _, s := range info.Settings {
+				switch s.Key {
+				case "vcs.revision":
+					commit = s.Value
+				case "vcs.time":
+					date = s.Value
+				}
+			}
+		}
+	}
+
 	short := commit
 	if len(commit) > 7 {
 		short = commit[:7]
@@ -30,158 +47,127 @@ func build() string {
 	return fmt.Sprintf("%s (%s) %s", version, short, date)
 }
 
-func envars(strs ...string) []string {
-	for i, s := range strs {
-		strs[i] = "DIRWATCH_" + s
+func setupLogger(level string, logFile string, noColor bool) error {
+	parsedLevel, err := zerolog.ParseLevel(level)
+	if err != nil {
+		return fmt.Errorf("parsing log level: %w", err)
 	}
-	return strs
+
+	var output io.Writer = zerolog.ConsoleWriter{Out: os.Stderr, NoColor: noColor}
+
+	if logFile != "" {
+		logDir := filepath.Dir(logFile)
+		if err := os.MkdirAll(logDir, 0755); err != nil {
+			return fmt.Errorf("creating log directory: %w", err)
+		}
+
+		file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			return fmt.Errorf("opening log file: %w", err)
+		}
+
+		output = io.MultiWriter(
+			zerolog.ConsoleWriter{Out: os.Stderr, NoColor: noColor},
+			file,
+		)
+	}
+
+	log.Logger = log.Output(output).Level(parsedLevel)
+
+	return nil
 }
 
 func main() {
-	log.Logger = log.Output(zerolog.ConsoleWriter{
-		Out:     os.Stderr,
-		NoColor: true,
-	})
+	os.Exit(run())
+}
 
-	app := &cli.App{
-		Name:    "dirwatch",
-		Usage:   "Watches a file directory and runs a shell command",
-		Version: build(),
+func run() int {
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+
+	flags := &commands.Flags{}
+
+	app := &cli.Command{
+		Name:                  "dirwatch",
+		Usage:                 "Watches a file directory and runs a shell command",
+		Version:               build(),
+		EnableShellCompletion: true,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:    "config",
-				Usage:   "path to the configuration file",
-				Value:   "dirwatch.toml",
-				EnvVars: envars("CONFIG"),
+				Name:        "log-level",
+				Usage:       "log level (debug, info, warn, error, fatal, panic)",
+				Sources:     cli.EnvVars("DIRWATCH_LOG_LEVEL"),
+				Value:       "info",
+				Destination: &flags.LogLevel,
+			},
+			&cli.BoolFlag{
+				Name:        "no-color",
+				Usage:       "disable colored output",
+				Sources:     cli.EnvVars("NO_COLOR"),
+				Destination: &flags.NoColor,
+			},
+			&cli.StringFlag{
+				Name:        "log-file",
+				Usage:       "path to log file (optional)",
+				Sources:     cli.EnvVars("DIRWATCH_LOG_FILE"),
+				Destination: &flags.LogFile,
+			},
+			&cli.StringFlag{
+				Name:        "config",
+				Usage:       "path to config file",
+				Sources:     cli.EnvVars("DIRWATCH_CONFIG"),
+				Destination: &flags.ConfigFile,
 			},
 		},
-		Commands: []*cli.Command{
-			{
-				Name:  "watch",
-				Usage: "watch with configuration file",
-				Action: func(ctx *cli.Context) error {
-					path := ctx.String("config")
+		Before: func(ctx context.Context, c *cli.Command) (context.Context, error) {
+			cfg, err := flags.LoadConfig()
+			if err != nil {
+				return ctx, fmt.Errorf("loading config: %w", err)
+			}
+			flags.Config = cfg
 
-					file, err := os.Open(path)
-					if err != nil {
-						return err
-					}
+			if !c.IsSet("log-level") && cfg.Log.Level != "" {
+				flags.LogLevel = cfg.Log.Level
+			}
+			if !c.IsSet("log-file") && cfg.Log.File != "" {
+				flags.LogFile = cfg.Log.File
+			}
+			logFile := flags.LogFile
+			if logFile == "" {
+				logFile = filepath.Join(paths.DataDir(), "dirwatch.log")
+			}
 
-					cfg, err := config.New(path, file)
-					if err != nil {
-						return err
-					}
+			if err := setupLogger(flags.LogLevel, logFile, flags.NoColor); err != nil {
+				return ctx, err
+			}
 
-					// configure logger
-					if cfg.Log.File != "" {
-						file, err := os.OpenFile(cfg.Log.File, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-						if err != nil {
-							log.Fatal().Err(err).Msg("failed to open log file")
-						}
-
-						w := io.MultiWriter(os.Stderr, file)
-
-						log.Logger = log.Output(zerolog.ConsoleWriter{
-							Out:     w,
-							NoColor: !cfg.Log.Color,
-						})
-					}
-
-					// Create new watcher.
-					watcher, err := fsnotify.NewWatcher()
-					if err != nil {
-						log.Fatal().Err(err).Msg("failed to create watcher")
-					}
-					defer watcher.Close()
-
-					for _, w := range cfg.Watchers {
-						for _, p := range w.Dirs {
-							log.Info().Str("path", p).Msg("watching path")
-							err := watcher.Add(p)
-							if err != nil {
-								return err
-							}
-						}
-					}
-
-					hdlr := watchhandler.New(cfg)
-
-					// Start listening for events.
-					go func() {
-						for {
-							select {
-							case event, ok := <-watcher.Events:
-								if !ok {
-									return
-								}
-
-								if event.Op.Has(fsnotify.Chmod) {
-									// Skip Chmod events.
-									continue
-								}
-
-								log.Debug().
-									Str("event", event.Op.String()).
-									Str("file_name", event.Name).
-									Msg("event")
-
-								hdlr.Handle(event)
-							case err, ok := <-watcher.Errors:
-								if !ok {
-									return
-								}
-								log.Error().Err(err).Msg("error")
-							}
-						}
-					}()
-
-					// Add a path.
-					err = watcher.Add("/tmp")
-					if err != nil {
-						log.Error().Err(err).Msg("failed to add path")
-					}
-
-					// Block main goroutine forever.
-					<-make(chan struct{})
-
-					return nil
-				},
-			},
-			{
-				Name:   "dev",
-				Hidden: true,
-				Subcommands: []*cli.Command{
-					{
-						Name:  "dump",
-						Usage: "dump the configuration",
-						Action: func(ctx *cli.Context) error {
-							path := ctx.String("config")
-
-							file, err := os.Open(path)
-							if err != nil {
-								return err
-							}
-
-							cfg, err := config.New(path, file)
-							if err != nil {
-								return err
-							}
-
-							dump, err := cfg.Dump()
-							if err != nil {
-								return err
-							}
-
-							fmt.Println(dump)
-							return nil
-						},
-					},
-				},
-			},
+			return ctx, nil
 		},
 	}
 
-	if err := app.Run(os.Args); err != nil {
-		log.Fatal().Err(err).Msg("failed to run dirwatch")
+	app = commands.NewWatchCmd(flags).Register(app)
+	app = commands.NewConfigCmd(flags).Register(app)
+	app = commands.NewDoctorCmd(flags).Register(app)
+	// +scaffold:command:register
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	if err := app.Run(ctx, os.Args); err != nil {
+		colorRed := "\033[38;2;215;95;107m"
+		colorGray := "\033[38;2;163;163;163m"
+		colorReset := "\033[0m"
+		if flags.NoColor {
+			colorRed = ""
+			colorGray = ""
+			colorReset = ""
+		}
+		fmt.Fprintf(os.Stderr, "\n%s╭ Error%s\n%s│%s %s%s%s\n%s╵%s\n",
+			colorRed, colorReset,
+			colorRed, colorReset, colorGray, err.Error(), colorReset,
+			colorRed, colorReset,
+		)
+		return 1
 	}
+
+	return 0
 }
