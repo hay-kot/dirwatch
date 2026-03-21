@@ -12,10 +12,10 @@ import (
 )
 
 type WatchHandler struct {
-	cfg *config.Config
+	cfg config.Config
 }
 
-func New(cfg *config.Config) *WatchHandler {
+func New(cfg config.Config) *WatchHandler {
 	return &WatchHandler{
 		cfg: cfg,
 	}
