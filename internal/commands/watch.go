@@ -35,7 +35,11 @@ func (cmd *WatchCmd) run(ctx context.Context, c *cli.Command) error {
 	if err != nil {
 		return fmt.Errorf("creating watcher: %w", err)
 	}
-	defer watcher.Close()
+	defer func() {
+		if err := watcher.Close(); err != nil {
+			log.Error().Err(err).Msg("closing watcher")
+		}
+	}()
 
 	for _, w := range cfg.Watchers {
 		for _, p := range w.Dirs {

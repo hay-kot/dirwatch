@@ -57,11 +57,11 @@ func setupLogger(level string, logFile string, noColor bool) error {
 
 	if logFile != "" {
 		logDir := filepath.Dir(logFile)
-		if err := os.MkdirAll(logDir, 0755); err != nil {
+		if err := os.MkdirAll(logDir, 0o755); err != nil {
 			return fmt.Errorf("creating log directory: %w", err)
 		}
 
-		file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 		if err != nil {
 			return fmt.Errorf("opening log file: %w", err)
 		}
