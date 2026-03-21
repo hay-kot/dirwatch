@@ -1,8 +1,8 @@
-# This is an example .goreleaser.yml file with some sensible defaults.
-# Make sure to check the documentation at https://goreleaser.com
+version: 2
 before:
   hooks:
     - go mod tidy
+
 builds:
   - env:
       - CGO_ENABLED=0
@@ -10,10 +10,15 @@ builds:
       - linux
       - windows
       - darwin
+    goarch:
+      - amd64
+      - arm
+      - arm64
+    goarm:
+      - "7"
 
 archives:
-  - format: tar.gz
-    # this name template makes the OS and Arch compatible with the results of uname.
+  - formats: [tar.gz]
     name_template: >-
       {{ .ProjectName }}_
       {{- title .Os }}_
@@ -21,20 +26,36 @@ archives:
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
       {{- if .Arm }}v{{ .Arm }}{{ end }}
-    # use zip for windows archives
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [zip]
+
 checksum:
   name_template: "checksums.txt"
+
 snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+  version_template: "{{ incpatch .Version }}-next"
+
 changelog:
   sort: asc
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\(\w+\))??!?:.+$'
+      order: 0
+    - title: Bug Fixes
+      regexp: '^.*?fix(\(\w+\))??!?:.+$'
+      order: 1
+    - title: Documentation
+      regexp: '^.*?docs(\(\w+\))??!?:.+$'
+      order: 2
+    - title: Other
+      order: 999
   filters:
     exclude:
-      - "^docs:"
       - "^test:"
+      - "^chore:"
+      - "^ci:"
+
 brews:
   - repository:
       owner: hay-kot
@@ -48,15 +69,11 @@ brews:
         type: optional
       - name: git
     service: |
-      run [opt_bin/"dirwatch", "--config", etc/"dirwatch.toml", "watch"]
+      run [opt_bin/"dirwatch", "watch"]
       environment_variables PATH: std_service_path_env
+      environment_variables DIRWATCH_CONFIG: etc/"config.yaml"
       keep_alive true
       error_log_path var/"log/dirwatch.log"
       log_path var/"log/dirwatch.log"
     test: |
-      system "#{bin}/dirwatch version"
-
-# The lines beneath this are called `modelines`. See `:help modeline`
-# Feel free to remove those if you don't want/use them.
-# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
-# vim: set ts=2 sw=2 tw=0 fo=cnqoj
+      system "#{bin}/dirwatch --version"
