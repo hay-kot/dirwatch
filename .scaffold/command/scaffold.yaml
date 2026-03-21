@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=https://hay-kot.github.io/scaffold/schema.json
+questions:
+  - name: "command_name"
+    prompt:
+      message: "Command Name"
+      description: "kebab-case command name"
+    validate:
+      required: true
+      match:
+        regex: "^[a-z]+(-[a-z]+)*$"
+        message: "must be kebab-case"
+
+rewrites:
+  - from: templates/internal/commands/command.go
+    to: "internal/commands/{{ .Scaffold.command_name }}.go"
+
+inject:
+  - name: "register command"
+    path: main.go
+    at: "// +scaffold:command:register"
+    mode: after
+    template: |
+      app = commands.New{{ .Scaffold.command_name | toPascalCase }}Cmd(flags).Register(app)
+
+presets:
+  default:
+    command_name: "example"
