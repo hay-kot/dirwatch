@@ -47,6 +47,17 @@ func build() string {
 	return fmt.Sprintf("%s (%s) %s", version, short, date)
 }
 
+const maxLogSize = 10 * 1024 * 1024 // 10 MB
+
+// rotateLogFile renames the log file to .1 if it exceeds maxLogSize.
+func rotateLogFile(path string) {
+	info, err := os.Stat(path)
+	if err != nil || info.Size() < maxLogSize {
+		return
+	}
+	_ = os.Rename(path, path+".1")
+}
+
 func setupLogger(level string, logFile string, noColor bool) error {
 	parsedLevel, err := zerolog.ParseLevel(level)
 	if err != nil {
@@ -60,6 +71,8 @@ func setupLogger(level string, logFile string, noColor bool) error {
 		if err := os.MkdirAll(logDir, 0o755); err != nil {
 			return fmt.Errorf("creating log directory: %w", err)
 		}
+
+		rotateLogFile(logFile)
 
 		file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 		if err != nil {
@@ -147,6 +160,10 @@ func run() int {
 	app = commands.NewWatchCmd(flags).Register(app)
 	app = commands.NewConfigCmd(flags).Register(app)
 	app = commands.NewDoctorCmd(flags).Register(app)
+	app = commands.NewInstallCmd(flags).Register(app)
+	app = commands.NewUninstallCmd(flags).Register(app)
+	app = commands.NewRestartCmd(flags).Register(app)
+	app = commands.NewStatusCmd(flags).Register(app)
 	// +scaffold:command:register
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

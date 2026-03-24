@@ -4,11 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/urfave/cli/v3"
-
-	"github.com/hay-kot/dirwatch/internal/paths"
 )
 
 type DoctorCmd struct {
@@ -32,11 +29,11 @@ func (cmd *DoctorCmd) run(ctx context.Context, c *cli.Command) error {
 	ok := true
 	cfg := cmd.flags.Config
 
-	configPath := cmd.flags.ConfigFile
+	configPath := cmd.flags.ResolvedConfigPath
 	if configPath == "" {
-		configPath = filepath.Join(paths.ConfigDir(), "config.yaml")
-	}
-	if _, err := os.Stat(configPath); err != nil {
+		fmt.Println("  config: (not found)")
+		ok = false
+	} else if _, err := os.Stat(configPath); err != nil {
 		fmt.Printf("  config: %s (not found)\n", configPath)
 		ok = false
 	} else {

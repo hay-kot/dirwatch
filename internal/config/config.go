@@ -46,8 +46,33 @@ func Default() Config {
 	}
 }
 
+// configNames is the list of config file names searched in priority order.
+var configNames = []string{
+	"dirwatch.yaml",
+	"dirwatch.yml",
+	"config.yaml",
+	"config.yml",
+}
+
+// Find locates the config file path by searching for known filenames in the
+// config directory. Returns an empty string if no config file is found.
+func Find() string {
+	dir := paths.ConfigDir()
+	for _, name := range configNames {
+		p := filepath.Join(dir, name)
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	return ""
+}
+
 func Read() (Config, error) {
-	return ReadFrom(filepath.Join(paths.ConfigDir(), "config.yaml"))
+	path := Find()
+	if path == "" {
+		return Default(), nil
+	}
+	return ReadFrom(path)
 }
 
 func ReadFrom(path string) (Config, error) {

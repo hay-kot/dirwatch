@@ -8,11 +8,22 @@ type Flags struct {
 	LogFile    string
 	ConfigFile string
 	Config     config.Config
+
+	// ResolvedConfigPath is the absolute path to the config file that was loaded.
+	ResolvedConfigPath string
 }
 
 func (f *Flags) LoadConfig() (config.Config, error) {
 	if f.ConfigFile != "" {
+		f.ResolvedConfigPath = f.ConfigFile
 		return config.ReadFrom(f.ConfigFile)
 	}
-	return config.Read()
+
+	path := config.Find()
+	if path == "" {
+		return config.Default(), nil
+	}
+
+	f.ResolvedConfigPath = path
+	return config.ReadFrom(path)
 }
