@@ -1,0 +1,20 @@
+shell: /bin/zsh
+shell_cmd: "-c"
+
+log:
+  level: info
+  format: text
+  color: true
+
+vars:
+  scriptbin: /Users/hayden/.dotfiles/bin/
+
+watchers:
+  - dirs:
+      - ~/Downloads
+    events:
+      - create
+    matches:
+      - "*.HEIC"
+      - "*.heic"
+    exec: "{{ .Vars.scriptbin }}/heic2jpeg '{{ .Path }}'"
