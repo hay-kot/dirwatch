@@ -21,18 +21,20 @@ func New(cfg config.Config) *WatchHandler {
 	}
 }
 
-func (wh *WatchHandler) findWatcher(path string) (config.Watcher, bool) {
+func (wh *WatchHandler) findWatchers(path string) []config.Watcher {
 	pathdir := filepath.Dir(path)
 
+	var watchers []config.Watcher
 	for _, w := range wh.cfg.Watchers {
 		for _, d := range w.Dirs {
 			if d == pathdir {
-				return w, true
+				watchers = append(watchers, w)
+				break
 			}
 		}
 	}
 
-	return config.Watcher{}, false
+	return watchers
 }
 
 func EventStrToOp(event fsnotify.Event) string {
@@ -53,8 +55,8 @@ func EventStrToOp(event fsnotify.Event) string {
 }
 
 func (wh *WatchHandler) Handle(event fsnotify.Event) {
-	w, ok := wh.findWatcher(event.Name)
-	if !ok {
+	watchers := wh.findWatchers(event.Name)
+	if len(watchers) == 0 {
 		log.Debug().
 			Str("event", event.Op.String()).
 			Str("file_name", event.Name).
@@ -62,42 +64,67 @@ func (wh *WatchHandler) Handle(event fsnotify.Event) {
 		return
 	}
 
-	// verify event type
 	eventStr := EventStrToOp(event)
+	filename := filepath.Base(event.Name)
 
-	hasEvent := false
-	for _, e := range w.Events {
-		if e == eventStr {
-			hasEvent = true
-			break
+	for _, w := range watchers {
+		if !hasEvent(w, eventStr) {
+			log.Debug().
+				Str("event", event.Op.String()).
+				Str("file_name", event.Name).
+				Msg("no event match found for event")
+			continue
+		}
+
+		if !matchesPattern(w, filename) {
+			log.Debug().
+				Str("event", event.Op.String()).
+				Str("file_name", event.Name).
+				Msg("no file match found for event")
+			continue
+		}
+
+		cmdstr, err := quicktmpl.Render(w.Exec, quicktmpl.Data{
+			"Path": event.Name,
+			"Vars": wh.cfg.Vars,
+		})
+		if err != nil {
+			continue
+		}
+
+		cmd := exec.Command(wh.cfg.Shell, wh.cfg.ShellCmd, cmdstr)
+		cmd.Stdout = log.Logger
+		cmd.Stderr = log.Logger
+
+		if err := cmd.Run(); err != nil {
+			log.Error().Err(err).Msg("failed to run command")
 		}
 	}
+}
 
-	if !hasEvent {
-		log.Debug().
-			Str("event", event.Op.String()).
-			Str("file_name", event.Name).
-			Msg("no event match found for event")
-		return
+func hasEvent(w config.Watcher, eventStr string) bool {
+	for _, e := range w.Events {
+		if e == eventStr {
+			return true
+		}
 	}
+	return false
+}
 
-	// verify path matches
-	hasMatch := false
-	filename := filepath.Base(event.Name)
+func matchesPattern(w config.Watcher, filename string) bool {
 	for _, d := range w.Match {
 		match, err := doublestar.Match(d, filename)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to match")
-			return
+			return false
 		}
 
 		if match {
-			hasMatch = true
 			log.Debug().
 				Str("file_name", filename).
 				Str("pattern", d).
 				Msg("match")
-			break
+			return true
 		}
 
 		log.Debug().
@@ -105,30 +132,5 @@ func (wh *WatchHandler) Handle(event fsnotify.Event) {
 			Str("pattern", d).
 			Msg("no match")
 	}
-
-	if !hasMatch {
-		log.Debug().
-			Str("event", event.Op.String()).
-			Str("file_name", event.Name).
-			Msg("no file match found for event")
-		return
-	}
-
-	cmdstr, err := quicktmpl.Render(w.Exec, quicktmpl.Data{
-		"Path": event.Name,
-		"Vars": wh.cfg.Vars,
-	})
-	if err != nil {
-		return
-	}
-
-	cmd := exec.Command(wh.cfg.Shell, wh.cfg.ShellCmd, cmdstr)
-
-	cmd.Stdout = log.Logger
-	cmd.Stderr = log.Logger
-
-	err = cmd.Run()
-	if err != nil {
-		log.Error().Err(err).Msg("failed to run command")
-	}
+	return false
 }
